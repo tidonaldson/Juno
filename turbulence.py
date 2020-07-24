@@ -6,8 +6,7 @@ Created on Mon Jul 20 16:46:39 2020
 """
 
 
-from dataClasses import getFiles
-from dataClasses import FGMData
+from dataClasses import getFiles, FGMData
 import numpy as np
 import pandas as pd
 import os,datetime,logging,pathlib,struct
