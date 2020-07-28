@@ -191,7 +191,7 @@ class turbulence(FGMData):
                 
                 r = LinearRegression()                                         #perform linear regression to find power law fits
                 r.fit(np.reshape(np.log10(freq_mhd),(-1,1)), np.reshape(np.log10(psd_perp[b1]),(-1,1)))
-                self.mhd_slopelist.append(r.coef_)
+                self.mhd_slopelist.append(r.coef_)                             #create list of slopes for KAW and MHD per each interval
                 
                 r.fit(np.reshape(np.log10(freq_kaw),(-1,1)), np.reshape(np.log10(psd_perp[b2]),(-1,1)))
                 self.kaw_slopelist.append(r.coef_)
@@ -217,8 +217,10 @@ class turbulence(FGMData):
                 ax2.set_xlabel('frequency [Hz]')
                 ax2.set_ylabel('Power Density \n [$nT^2$/Hz]')
                 ax2.set_yticks([1e-3,1e-1,1e1,1e3,1e5])
+                plt.tight_layout()
                 
-                saveName = f'PSD_and_q_{date}_{i}'
+                
+                saveName = f'PSD_and_q_{date}_{i}'                             #create file name with date and interval on that day
                 plt.savefig(f'{self.savePath}\\{saveName}')
                
             mean_q = (np.array(qmhd_list) + np.array(qkaw_list))/2
@@ -236,13 +238,16 @@ class turbulence(FGMData):
                 
                 
                 plt.xticks(xtick, [str(xtick[0])+':00',str(xtick[1])+':00',str(xtick[2])+':00',str(xtick[3])+':00',str(xtick[4])+':00',str(xtick[5])+':00',str(xtick[6])+':00'])
+                plt.rcParams['xtick.bottom'] = plt.rcParams['xtick.labelbottom']=True
+                plt.rcParams['xtick.top'] = True
+                
                 plt.title(date)
                 plt.yscale('log')
                 plt.xlabel('time [hours]')
                 plt.ylabel('mean heating rate density [W/$m^2$]')
         
                 timeFormat = {0:'0000',1:'0600',2:'1200',3:'1800'}
-                saveName = f'q_time_domain_{date}_{timeFormat[i]}'
+                saveName = f'q_time_domain_{date}_{timeFormat[i]}'             #produces file name with date and start time
                 
                 plt.savefig(f'{self.savePath}/{saveName}')
         
@@ -251,7 +256,7 @@ class turbulence(FGMData):
         
         plt.figure()                                                           #create histograms of power laws and KAW and MHD differences
         plt.hist(np.reshape(mhd_slope,(-1,1)),8)
-        plt.plot((-5/3,-5/3),(0,len(self.mhd_slopelist)))
+        plt.plot((-5/3,-5/3),(0,len(self.mhd_slopelist)))                       #theoretical power law
         plt.xlabel('MHD Power Law')
         plt.ylabel('count')
         plt.title('MHD')
@@ -260,7 +265,7 @@ class turbulence(FGMData):
         
         plt.figure()
         plt.hist(np.reshape(kaw_slope,(-1,1)),8)
-        plt.plot((-7/3,-7/3),(0,len(self.kaw_slopelist)))
+        plt.plot((-7/3,-7/3),(0,len(self.kaw_slopelist)))                      #theoretical power law
         plt.xlabel('KAW Power Law')
         plt.ylabel('count')
         plt.title('KAW')
@@ -287,7 +292,7 @@ def run_turbulence(startTime,endTime,fileType,dataType,fileList,step,window,inte
     b = turbulence(a[1],a[2],startTime,endTime,step,window,interval,savePath)
     return b                
 #--------------------------------------------------------------------------------------------------                
-h1 = run_turbulence('2017-03-09T00:00:00.000','2017-03-10T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,60,1800,'C:\\Users\YUNG TI\Desktop\Juno\Figures')                
+h1 = run_turbulence('2016-11-15T00:00:00.000','2017-01-07T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,60,1800,'C:\\Users\YUNG TI\Desktop\Juno\Figures')                
 #h2 = run_turbulence('2016-09-20T00:00:00.000','2016-09-25T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,30,1200)                
 #h3 = run_turbulence('2016-09-20T00:00:00.000','2016-09-25T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,30,1800)                              
              
