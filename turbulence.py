@@ -88,12 +88,13 @@ class turbulence(FGMData):
     Inherits FGMData class to extract BX, BY, and BZ data. \n
     dateList must be from getFiles, and startTime and endTime must be in UTC 
     i.e., "2016-09-22T00:00:00.0000"""
-    def __init__(self, dateList, filelist, startTime, endTime, step, window, interval):
+    def __init__(self, dateList, filelist, startTime, endTime, step, window, interval,savePath):
         super().__init__(filelist, startTime, endTime)
         self.dateList = dateList
         self.step = step                                        
         self.window = window                                                   #for average B field
         self.interval = interval                                               #interval over which PSD is found
+        self.savePath = savePath                                               
         self.m = 23/6.0229e26
         self.z = 1.6
         self.q = 1.6e-19
@@ -212,24 +213,38 @@ class turbulence(FGMData):
                 ax2.loglog(freq[b3],psd_perp[b3]*1e18, linewidth = 1)
                 ax2.loglog(freq_mhd,psd_perp[b1]*1e18,'r', linewidth = 0.5)
                 ax2.loglog(freq_kaw,psd_perp[b2]*1e18,'b', linewidth = 0.5)
-                ax2.loglog((gyrofreq,gyrofreq),(0,np.max(psd_perp)*1e20),'-')
+                ax2.loglog((gyrofreq,gyrofreq),(0,np.max(psd_perp)*1e20),'g--')
                 ax2.set_xlabel('frequency [Hz]')
                 ax2.set_ylabel('Power Density \n [$nT^2$/Hz]')
                 ax2.set_yticks([1e-3,1e-1,1e1,1e3,1e5])
-            
+                
+                saveName = f'PSD_and_q_{date}_{i}'
+                plt.savefig(f'{self.savePath}\\{saveName}')
+               
             mean_q = (np.array(qmhd_list) + np.array(qkaw_list))/2
             time = np.linspace(np.min(self.dataDict[date]['TIME_ARRAY']),np.max(self.dataDict[date]['TIME_ARRAY']),len(mean_q))
             
             for i in range(4):
+                
                 xtick = np.arange(i*6,(1+i)*6+1)
-                plt.figure()                                                         #plot q over time on a 24 hour window
-                plt.plot(time[i*int(len(mean_q)/4):(1+i)*int(len(mean_q)/4)],mean_q[i*int(len(mean_q)/4):(i+1)*int(len(mean_q)/4)])            
-                plt.xticks(xtick, [str(xtick[0]),str(xtick[1]),str(xtick[2]),str(xtick[3]),str(xtick[4]),str(xtick[5]),str(xtick[6])])
+                plt.figure()                                                         #plot q over time on a 6 hour window
+                timeloop = time[i*int(len(mean_q)/4):(1+i)*int(len(mean_q)/4)]
+                qloop = mean_q[i*int(len(mean_q)/4):(i+1)*int(len(mean_q)/4)]
+                
+                for k in range(len(qloop)-1):
+                    plt.plot((timeloop[k],timeloop[k+1]),(qloop[k],qloop[k]),'b')            
+                
+                
+                plt.xticks(xtick, [str(xtick[0])+':00',str(xtick[1])+':00',str(xtick[2])+':00',str(xtick[3])+':00',str(xtick[4])+':00',str(xtick[5])+':00',str(xtick[6])+':00'])
                 plt.title(date)
                 plt.yscale('log')
                 plt.xlabel('time [hours]')
                 plt.ylabel('mean heating rate density [W/$m^2$]')
         
+                timeFormat = {0:'0000',1:'0600',2:'1200',3:'1800'}
+                saveName = f'q_time_domain_{date}_{timeFormat[i]}'
+                
+                plt.savefig(f'{self.savePath}/{saveName}')
         
         mhd_slope = np.array(self.mhd_slopelist)
         kaw_slope = np.array(self.kaw_slopelist)
@@ -240,6 +255,8 @@ class turbulence(FGMData):
         plt.xlabel('MHD Power Law')
         plt.ylabel('count')
         plt.title('MHD')
+        saveName = f'hist_MHD_power_law_{min(self.dateList)}_{max(self.dateList)}'
+        plt.savefig(f'{self.savePath}/{saveName}')
         
         plt.figure()
         plt.hist(np.reshape(kaw_slope,(-1,1)),8)
@@ -247,27 +264,30 @@ class turbulence(FGMData):
         plt.xlabel('KAW Power Law')
         plt.ylabel('count')
         plt.title('KAW')
+        saveName = f'hist_KAW_power_law_{min(self.dateList)}_{max(self.dateList)}'
+        plt.savefig(f'{self.savePath}/{saveName}')
         
         q_diff = np.log10(np.array(self.qmhd_biglist))-np.log10(np.array(self.qkaw_biglist))
         plt.figure()
         plt.hist(q_diff,8)
         plt.ylabel('count')
         plt.xlabel('$log_1$$_0$($q_M$$_H$$_D$)-$log_1$$_0$(q$_K$$_A$$_W$)')
-                
+        saveName = f'hist_scale_diff_{min(self.dateList)}_{max(self.dateList)}'
+        plt.savefig(f'{self.savePath}/{saveName}')        
                 
                 
 #--------------------------------------------------------------------------------------------------
 
-def run_turbulence(startTime,endTime,fileType,dataType,fileList,step,window,interval):
+def run_turbulence(startTime,endTime,fileType,dataType,fileList,step,window,interval,savePath):
     """perform turbulence analysis on given MAG data.  \n startTime and endTime in UTC,
     for example: '2016-09-20T00:00:00.000'.  \n step, window, and interval all must be given 
     as integers in seconds"""
     
     a = getFiles(startTime,endTime,fileType, fileList,dataType)
-    b = turbulence(a[1],a[2],startTime,endTime,step,window,interval)
+    b = turbulence(a[1],a[2],startTime,endTime,step,window,interval,savePath)
     return b                
 #--------------------------------------------------------------------------------------------------                
-h1 = run_turbulence('2017-03-09T00:00:00.000','2017-03-10T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,60,1800)                
+h1 = run_turbulence('2017-03-09T00:00:00.000','2017-03-10T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,60,1800,'C:\\Users\YUNG TI\Desktop\Juno\Figures')                
 #h2 = run_turbulence('2016-09-20T00:00:00.000','2016-09-25T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,30,1200)                
 #h3 = run_turbulence('2016-09-20T00:00:00.000','2016-09-25T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,30,1800)                              
              
