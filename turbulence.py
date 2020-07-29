@@ -229,9 +229,11 @@ class turbulence(FGMData):
             for i in range(4):
                 
                 xtick = np.arange(i*6,(1+i)*6+1)
-                plt.figure()                                                         #plot q over time on a 6 hour window
-                timeloop = time[i*int(len(mean_q)/4):(1+i)*int(len(mean_q)/4)]
-                qloop = mean_q[i*int(len(mean_q)/4):(i+1)*int(len(mean_q)/4)]
+                plt.figure(figsize = (10,4))                                                         #plot q over time on a 6 hour window
+                index = np.where((i*6<=time) & ((i+1)*6>=time))
+                
+                timeloop = time[index]
+                qloop = mean_q[index]
                 
                 for k in range(len(qloop)-1):
                     plt.plot((timeloop[k],timeloop[k+1]),(qloop[k],qloop[k]),'b')            
@@ -292,7 +294,7 @@ def run_turbulence(startTime,endTime,fileType,dataType,fileList,step,window,inte
     b = turbulence(a[1],a[2],startTime,endTime,step,window,interval,savePath)
     return b                
 #--------------------------------------------------------------------------------------------------                
-h1 = run_turbulence('2016-11-15T00:00:00.000','2017-01-07T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,60,1800,'C:\\Users\YUNG TI\Desktop\Juno\Figures')                
+h1 = run_turbulence('2016-11-15T00:00:00.000','2016-11-16T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,60,1800,'C:\\Users\YUNG TI\Desktop\Juno\Figures')                
 #h2 = run_turbulence('2016-09-20T00:00:00.000','2016-09-25T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,30,1200)                
 #h3 = run_turbulence('2016-09-20T00:00:00.000','2016-09-25T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,30,1800)                              
              
