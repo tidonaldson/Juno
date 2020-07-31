@@ -33,20 +33,20 @@ def q(psd_perp,freq, bx, by, bz, b1, b2, m):
     over freqency domains, according to b1 and b2 (respectively MHD and KAW freqency 
     domains. \n MAG vector components used only to find theta for k perp.  """
     delta_b_perp3 = (psd_perp*freq)**(3/2)
-    v_rel_x = -400e3   #m/s
-    v_rel_y = -100e3
+    v_rel_x = -400e3                                                           #convert to m/s
+    v_rel_y = -100e3                                                           #these parameters subject to change over spatial domain
     v_rel_mag = 300e3
-    avgbx = np.mean(bx)*np.ones(len(bx))
+    avgbx = np.mean(bx)*np.ones(len(bx))                                       #converted to vector for dot product
     avgby = np.mean(by)*np.ones(len(bx))
     avgbz = np.mean(bz)*np.ones(len(bz))
     mean_b_mag = np.sqrt(avgbx**2 + avgby**2 + avgbz**2)
-    #dotfactor = (avgbx*v_rel_x + avgby*v_rel_y)/(mean_b_mag*v_rel_mag)
+    #dotfactor = (avgbx*v_rel_x + avgby*v_rel_y)/(mean_b_mag*v_rel_mag)        #find dot product and corresponding angle for k perp
     #theta = np.arccos((dotfactor))
     n_density = 0.1*(100**3)
     density = m*n_density
     mu_0 = np.pi*4*1e-7
-    kperp = (2*np.pi*freq)/(v_rel_mag*np.sin(np.pi/2))
-    rho_i = 1e7
+    kperp = (2*np.pi*freq)/(v_rel_mag*np.sin(np.pi/2))                         #currently just assumes v rel and B are perpendicular
+    rho_i = 1e7                                                                #parameter subject to change, currently an estimation from Tao et al
     
     qkaw = (0.5*(delta_b_perp3[b2])*kperp[b2]/np.sqrt(mu_0**3*density))*(1+kperp[b2]**2*rho_i**2)**0.5*(1+(1/(1+kperp[b2]**2*rho_i**2))*(1/(1+1.25*kperp[b2]**2*rho_i**2))**2)
     qmhd = (delta_b_perp3[b1])*kperp[b1]/(np.sqrt((mu_0**3)*density))
@@ -59,13 +59,14 @@ def freqrange(f, gyro):
     Inputs: f is frequency range for PSD, and gyro is the gyrofreqency for given domain. \n
     Returns the two frequency arrays and indices (tuples) for the two arrays. \n b1
     corresponds to MHD, b2 to KAW, and b3 to all real points of freqency range."""
-    b1 = np.where((f>3E-4) & (f<(gyro)))
+    
+    b1 = np.where((f>3E-4) & (f<(gyro)))                                       #MHD range
     freq_mhd = f[b1]
     
-    b2 = np.where((f>(gyro*1.5)) & (f<0.1))
+    b2 = np.where((f>(gyro*1.5)) & (f<0.1))                                    #KAW range
     freq_kaw = f[b2]
     
-    b3 = np.where((f>0)&(f<0.5))
+    b3 = np.where((f>0)&(f<0.5))                                               #range for all real frequency
     return freq_mhd, freq_kaw, b1, b2, b3 
 
 #-------------------------------------------------------------------------------
@@ -94,10 +95,10 @@ class turbulence(FGMData):
         self.step = step                                        
         self.window = window                                                   #for average B field
         self.interval = interval                                               #interval over which PSD is found
-        self.savePath = savePath                                               
-        self.m = 23/6.0229e26
-        self.z = 1.6
-        self.q = 1.6e-19
+        self.savePath = savePath                                               #directory for figures to be saved to
+        self.m = 23/6.0229e26                                                  #average ion mass
+        self.z = 1.6                                                           #charge state  
+        self.q = 1.6e-19                                                       #elementary charge
         self.mhd_slopelist = []
         self.kaw_slopelist = []
         self.qmhd_biglist = []
@@ -164,7 +165,7 @@ class turbulence(FGMData):
                 delta_b_par = np.sqrt(delta_bx_par**2 + delta_by_par**2 + delta_bz_par**2)
                 
                 fs = int(1/(self.step))                                        #sampling freqency, based off of given step size
-                freq = np.arange(0.1,len(delta_b_par))*fs/len(delta_b_par)     #finds freqency range (this is divided by 2 in freqrange function)
+                freq = np.arange(0.1,len(delta_b_par))*fs/len(delta_b_par)     #finds freqency range (this is ~divided by 2~ as per FFT analysis in freqrange function)
                 widths = 1/(1.03*freq)                                         #parameter for cwt
                 w0 = 6                                                         #as per Tao et. al. 2015
                 
@@ -172,7 +173,7 @@ class turbulence(FGMData):
                 psd_perp1 = PSDfxn(signal.cwt(delta_b_perp1, signal.morlet2, widths, w = w0), freq, delta_b_perp1, fs)
                 psd_perp2 = PSDfxn(signal.cwt(delta_b_perp2, signal.morlet2, widths, w = w0), freq, delta_b_perp2, fs)
                 psd_perp = (psd_perp1 + psd_perp2)*1e-18                       #calls PSDfxn to find PSD given morlet wavelet transforms of each vector component.  
-                                                                                #the two perpendicular compoenents are summed to find total perpendicular
+                                                                                #the two perpendicular compoenents are summed to find total perpendicular, converted to T^2
                 
                 gyrofreq = gyro(bx[self.interval*i:(1+i)*self.interval]*1e-9, by[self.interval*i:(i+1)*self.interval]*1e-9, bz[self.interval*i:(1+i)*self.interval]*1e-9, self.m, self.z, self.q)
                                                                                #finds gyrofreqency according to B values on given interval (which is why the above line is so long)
@@ -186,13 +187,13 @@ class turbulence(FGMData):
                 qmhd_list.append(mean_q_mhd)
                 qkaw_list.append(mean_q_kaw)
                 
-                self.qmhd_biglist.append(mean_q_mhd)                           #adds mean q values to list of every q value over the date range for histogram
+                self.qmhd_biglist.append(mean_q_mhd)                           #appends mean q values to list of every q value over the date range for histogram
                 self.qkaw_biglist.append(mean_q_kaw)
                 
                 r = LinearRegression()                                         #perform linear regression to find power law fits
                 r.fit(np.reshape(np.log10(freq_mhd),(-1,1)), np.reshape(np.log10(psd_perp[b1]),(-1,1)))
-                self.mhd_slopelist.append(r.coef_)                             #create list of slopes for KAW and MHD per each interval
-                
+                self.mhd_slopelist.append(r.coef_)                             #append to list of slopes for KAW and MHD per each interval.  
+                                                                               #I.E. each interval corresponds to one value of KAW slope and one value of MHD slope
                 r.fit(np.reshape(np.log10(freq_kaw),(-1,1)), np.reshape(np.log10(psd_perp[b2]),(-1,1)))
                 self.kaw_slopelist.append(r.coef_)
                 
@@ -229,19 +230,19 @@ class turbulence(FGMData):
             for i in range(4):
                 
                 xtick = np.arange(i*6,(1+i)*6+1)
-                plt.figure(figsize = (10,4))                                                         #plot q over time on a 6 hour window
-                index = np.where((i*6<=time) & ((i+1)*6>=time))
+                plt.figure(figsize = (10,4))                                     #plot q over time on a 6 hour window
+                index = np.where((i*6<=time) & ((i+1)*6>=time))                 #index for time within each 6 hr window
                 
-                timeloop = time[index]
-                qloop = mean_q[index]
+                timeloop = time[index]                                         #extracts time from time array to fit within 6 hr window
+                qloop = mean_q[index]                                          #extracts q from q array to correspond to the time
                 
                 for k in range(len(qloop)-1):
-                    plt.plot((timeloop[k],timeloop[k+1]),(qloop[k],qloop[k]),'b')            
+                    plt.plot((timeloop[k],timeloop[k+1]),(qloop[k],qloop[k]),'b')   #loop used to produce seperate horizontal lines for each value q         
                 
                 
                 plt.xticks(xtick, [str(xtick[0])+':00',str(xtick[1])+':00',str(xtick[2])+':00',str(xtick[3])+':00',str(xtick[4])+':00',str(xtick[5])+':00',str(xtick[6])+':00'])
                 plt.rcParams['xtick.bottom'] = plt.rcParams['xtick.labelbottom']=True
-                plt.rcParams['xtick.top'] = True
+                plt.rcParams['xtick.top'] = True                                    #format tick marks
                 
                 plt.title(date)
                 plt.yscale('log')
@@ -262,6 +263,7 @@ class turbulence(FGMData):
         plt.xlabel('MHD Power Law')
         plt.ylabel('count')
         plt.title('MHD')
+        
         saveName = f'hist_MHD_power_law_{min(self.dateList)}_{max(self.dateList)}'
         plt.savefig(f'{self.savePath}/{saveName}')
         
@@ -271,14 +273,16 @@ class turbulence(FGMData):
         plt.xlabel('KAW Power Law')
         plt.ylabel('count')
         plt.title('KAW')
+        
         saveName = f'hist_KAW_power_law_{min(self.dateList)}_{max(self.dateList)}'
         plt.savefig(f'{self.savePath}/{saveName}')
         
-        q_diff = np.log10(np.array(self.qmhd_biglist))-np.log10(np.array(self.qkaw_biglist))
+        q_diff = np.log10(np.array(self.qmhd_biglist))-np.log10(np.array(self.qkaw_biglist)) #find the log difference bewteen KAW and MHD scales
         plt.figure()
         plt.hist(q_diff,8)
         plt.ylabel('count')
         plt.xlabel('$log_1$$_0$($q_M$$_H$$_D$)-$log_1$$_0$(q$_K$$_A$$_W$)')
+        
         saveName = f'hist_scale_diff_{min(self.dateList)}_{max(self.dateList)}'
         plt.savefig(f'{self.savePath}/{saveName}')        
                 
@@ -292,9 +296,9 @@ def run_turbulence(startTime,endTime,fileType,dataType,fileList,step,window,inte
     
     a = getFiles(startTime,endTime,fileType, fileList,dataType)
     b = turbulence(a[1],a[2],startTime,endTime,step,window,interval,savePath)
-    return b                
+    return b                                                                     #The return output of this fxn is an instance of turbulence
 #--------------------------------------------------------------------------------------------------                
-h1 = run_turbulence('2016-11-15T00:00:00.000','2016-11-16T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,60,1800,'C:\\Users\YUNG TI\Desktop\Juno\Figures')                
+h1 = run_turbulence('2016-08-25T00:00:00.000','2016-08-30T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,60,1800,'C:\\Users\YUNG TI\Desktop\Juno\Figures')                
 #h2 = run_turbulence('2016-09-20T00:00:00.000','2016-09-25T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,30,1200)                
 #h3 = run_turbulence('2016-09-20T00:00:00.000','2016-09-25T00:00:00.000','csv','fgm','C:\\Users\\YUNG TI\\Desktop\\Juno\\Programming\\Data\\',1,30,1800)                              
              
