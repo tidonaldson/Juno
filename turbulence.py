@@ -190,13 +190,19 @@ class turbulence(FGMData):
                 self.qmhd_biglist.append(mean_q_mhd)                           #appends mean q values to list of every q value over the date range for histogram
                 self.qkaw_biglist.append(mean_q_kaw)
                 
-                r = LinearRegression()                                         #perform linear regression to find power law fits
-                r.fit(np.reshape(np.log10(freq_mhd),(-1,1)), np.reshape(np.log10(psd_perp[b1]),(-1,1)))
-                self.mhd_slopelist.append(r.coef_)                             #append to list of slopes for KAW and MHD per each interval.  
-                                                                               #I.E. each interval corresponds to one value of KAW slope and one value of MHD slope
-                r.fit(np.reshape(np.log10(freq_kaw),(-1,1)), np.reshape(np.log10(psd_perp[b2]),(-1,1)))
-                self.kaw_slopelist.append(r.coef_)
+                if len(q_mhd) == 0 or len(q_kaw) == 0:                          #check that there is a KAW or MHD scale on frequency range
+                    pass
                 
+                else:
+                
+                    r = LinearRegression()                                         #perform linear regression to find power law fits
+                    r.fit(np.reshape(np.log10(freq_mhd),(-1,1)), np.reshape(np.log10(psd_perp[b1]),(-1,1)))
+                    self.mhd_slopelist.append(r.coef_)                             #append to list of slopes for KAW and MHD per each interval.  
+                                                                               #I.E. each interval corresponds to one value of KAW slope and one value of MHD slope
+                    r.fit(np.reshape(np.log10(freq_kaw),(-1,1)), np.reshape(np.log10(psd_perp[b2]),(-1,1)))
+                    self.kaw_slopelist.append(r.coef_)
+                
+               
                
                 
                 fig = plt.figure()                                             #plot heating rate densities on frequency domain
