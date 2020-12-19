@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Dec 18 13:37:34 2020
+
+@author: tdonaldson
+"""
+
+
+from dataClasses import getFiles, FGMData
+import numpy as np
+import pandas as pd
+import os,datetime,logging,pathlib,struct
+import matplotlib.pyplot as plt
+from scipy import signal
+
+class turbulence(FGMData):
+    """calculates heating rate density and power spectral density then creates various plots.  \n Step, window, interval, and resolution must be in seconds as an integer.  \n
+    Inherits FGMData class to extract BX, BY, and BZ data. \n
+    dateList must be from getFiles, and startTime and endTime must be in UTC 
+    i.e., "2016-09-22T00:00:00.0000"""
+    def __init__(self, dateList, filelist, startTime, endTime, step, window, resolution):
+        super().__init__(filelist, startTime, endTime)
+        self.dateList = dateList
+        self.step = step                                        
+        self.window = window                                                   #for average B field                                                            
+        self.resolution = resolution                                               
+        self.bxbiglist = []
+        self.bybiglist = []
+        self.bzbiglist = []
+        self.get_q()
+        
+    def get_q(self):
+        
+        for date in self.dateList:
+          
+            bx = np.array(self.dataDict[date]['BX'])                           #extract MAG data for each day, compile into arrays         
+            by = np.array(self.dataDict[date]['BY'])
+            bz = np.array(self.dataDict[date]['BZ'])
+            self.bxbiglist.extend(bx)
+            self.bybiglist.extend(by)
+            self.bzbiglist.extend(bz)
+        bx= np.array(self.bxbiglist)
+        by = np.array(self.bybiglist)
+        bz = np.array(self.bzbiglist)
+                
+        avgbx = []
+        avgby = []
+        avgbz = []
+        freq = 0
+        
+        for i in range(len(bx)):
+            avebx = np.mean(bx[i*self.step:i*self.step + self.window])         #find average B field, given the window for taking running average 
+            aveby = np.mean(by[i*self.step:i*self.step +self.window])
+            avebz = np.mean(bz[i*self.step:i*self.step +self.window])
+            avgbx.append(avebx)
+            avgby.append(aveby)
+            avgbz.append(avebz)
+        avgbx = np.array(avgbx)
+        avgby = np.array(avgby)
+        avgbz = np.array(avgbz)
+            
+        bx = bx[0::self.resolution]                                            #picks out data points at each resolution value
+        by = by[0::self.resolution]
+        bz = bz[0::self.resolution]
+            
+        avgbx = avgbx[0::self.resolution]                                      #picks out average B field points at each resolution value
+        avgby = avgby[0::self.resolution]
+        avgbz = avgbz[0::self.resolution]
+        
+        delta_bx = bx - avgbx                                                  #B - B0 to get delta B
+        delta_by = by - avgby
+        delta_bz = bz - avgbz
+        dotfactor = (delta_bx*avgbx + delta_by*avgby +delta_bz*avgbz)/(avgbx**2 + avgby**2 + avgbz**2)
+            
+        delta_bx_par = dotfactor*avgbx                                         #decomposition of delta B alligned to average B field
+        delta_by_par = dotfactor*avgby
+        delta_bz_par = dotfactor*avgbz
+                
+        delta_bx_perp1 = delta_bx - delta_bx_par                               #subtract parallel component from delta B to get first perpendicular vector
+        delta_by_perp1 = delta_by - delta_by_par
+        delta_bz_perp1 = delta_bz - delta_bz_par
+        delta_b_perp1 = np.sqrt(delta_bx_perp1**2 + delta_by_perp1**2 + delta_bz_perp1**2)   
+        delta_bx_perp2 = []
+        delta_by_perp2 = []
+        delta_bz_perp2 = []
+                
+        for j in range(len(delta_bx_perp1)):                                   #cross product parallel with perp1 to find perp2
+            cross = np.cross([delta_bx_par[j],delta_by_par[j],delta_bz_par[j]],[delta_bx_perp1[j],delta_by_perp1[j],delta_bz_perp1[j]])
+            delta_bx_perp2.append(cross[0])                                    #extracts x, y, z components of 2nd perpendicular vector
+            delta_by_perp2.append(cross[1])
+            delta_bz_perp2.append(cross[2])
+        delta_bx_perp2 = np.array(delta_bx_perp2)
+        delta_by_perp2 = np.array(delta_by_perp2)
+        delta_bz_perp2 = np.array(delta_bz_perp2)
+        
+        delta_b_perp2 = np.sqrt(delta_bx_perp2**2+delta_by_perp2**2+delta_bz_perp2**2) #magnitude of components of second delta B perpendicular component
+        
+        delta_b_perp = np.sqrt(delta_b_perp1**2+delta_b_perp2**2)              #magnitude of total delta B perpendicular component
+        
+        fs = 1/(self.step*self.resolution)                                     #sampling frequency
+        w0 = 15                                                                #omega0 cycling frequency for wavelet transform
+        freq = np.arange(0,len(bx)/2+1)*fs/len(bx)                             #frequency range 
+        widths = w0*fs/(np.pi*2*freq)                                          #time scale for morlet wavelet transform
+        
+        cwt_perp = signal.cwt(delta_b_perp, signal.morlet2, widths, w=w0)      #continuous wavelet transform of delta B perpendicular components
+        psd_perplist = []
+        for i in range(len(freq)):                                             #as per Tao et al 2015, Power Spectum Density summation along for each time scale step from wavelet transform
+            
+            psd_perp =(2*fs/len(bx))*(sum(abs(cwt_perp[i,:])**2))/freq[i]
+            psd_perplist.append(psd_perp)
+        
+        fft_delta_b_perp = np.fft.rfft(delta_b_perp)                           #take fft for comparing to wavelet transform
+        
+        psd_perp = np.array(psd_perplist)                                       
+        x0 = freq[-1]                                                          #develop linear components for -5/3 power law line for comparing in the freqency domain
+        y0 = psd_perp[-1]
+        x1 = 1e-4
+        y1 = 10**((-5/3)*(np.log10(x1)-np.log10(x0))+np.log10(y0))
+                
+        fig = plt.figure()
+        ax1 = fig.add_subplot(211)
+        ax1.loglog(freq,psd_perplist)                                          #wavelet psd plot       
+        ax1.loglog((2.77E-5,2.77E-5),(0,1e4))                                  #10 hr period
+        ax1.loglog([5.55e-5,5.55e-5],(0,1e4))                                  #5 hr period
+        ax1.loglog([1.11E-4,1.11E-4],(0,1e4))                                  #2.5 hr period
+        ax1.loglog((x0,x1),(y0,y1))                                            #-5/3 power law
+        
+        ax2 = fig.add_subplot(212)                                             #fft psd plot
+        ax2.loglog(freq[0:len(fft_delta_b_perp)],abs(fft_delta_b_perp)**2,'.')
+        ax2.loglog((2.77E-5,2.77E-5),(0,1e4))
+        ax2.loglog([5.55e-5,5.55e-5],(0,1e4))
+        ax2.loglog([1.11E-4,1.11E-4],(0,1e4))
+        ax2.loglog((x0,x1),(y0,y1))
+
+#------------------------------------------------------------------------------------        
+def run_turbulence(startTime,endTime,fileType,dataType,fileList,step,window,resolution):
+    """perform signal processing on given MAG data.  \n startTime and endTime in UTC,
+    for example: '2016-09-20T00:00:00.000'.  \n step, window, interval, and resolution all must be given 
+    as integers in seconds"""
+    
+    a = getFiles(startTime,endTime,fileType, fileList,dataType)
+    b = turbulence(a[1],a[2],startTime,endTime,step,window,resolution)
+    return b  
+
+#-----------------------------------------------------------------------------------  
+
+h1 = run_turbulence('2017-06-10T00:00:01.502','2017-06-12T00:00:00.000','csv','fgm','/data/Python/',1,30,60)
+
+
